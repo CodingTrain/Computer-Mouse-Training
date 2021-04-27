@@ -19,7 +19,7 @@ model.compile({ optimizer: 'sgd', loss: 'meanSquaredError' });
 const W = 1920;
 const H = 1080;
 
-const raw = fs.readFileSync(`mouse_small.csv`, 'utf-8');
+const raw = fs.readFileSync(`mouse_data/mouse_small.csv`, 'utf-8');
 const rows = raw.split('\n');
 const rawData = [];
 for (let row of rows) {
@@ -44,9 +44,15 @@ for (let i = 0; i < rawData.length - (snapshot + 2); i++) {
 const xs = tf.tensor(xs_);
 const ys = tf.tensor(ys_);
 
-model.fit(xs, ys, {
-  epochs: 50,
-  callbacks: {
-    onEpochEnd: (epoch, log) => console.log(`Epoch ${epoch}: loss = ${log.loss}`),
-  },
-});
+async function run() {
+  await model.fit(xs, ys, {
+    epochs: 5,
+    callbacks: {
+      onEpochEnd: (epoch, log) => console.log(`Epoch ${epoch}: loss = ${log.loss}`),
+    },
+  });
+
+  // const inputs = tf.tensor([rawData.slice(0, snapshot)]);
+  // const outputs = model.predict(inputs);
+  // outputs.print();
+}
