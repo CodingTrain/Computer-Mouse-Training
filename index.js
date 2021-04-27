@@ -7,27 +7,37 @@ const snapshot = 10 * 2;
 const model = tf.sequential();
 model.add(
   tf.layers.dense({
-    units: 16,
+    units: 512,
     activation: 'relu',
     inputShape: [snapshot],
   })
 );
 
 model.add(tf.layers.dense({ units: 2, activation: 'sigmoid' }));
-model.compile({ optimizer: 'sgd', loss: 'meanSquaredError' });
+const optimizer = tf.train.adam();
+model.compile({
+  optimizer,
+  loss: 'meanSquaredError',
+  shuffle: true,
+});
 
 const W = 1920;
 const H = 1080;
 
-const raw = fs.readFileSync(`mouse_data/mouse_small.csv`, 'utf-8');
+const raw = fs.readFileSync(`mouse_data/mouse1619532364238.csv`, 'utf-8');
 const rows = raw.split('\n');
 const rawData = [];
+
+let rowCount = 0;
 for (let row of rows) {
-  const data = row.split(',');
-  const x = Math.floor(parseInt(data[0])) / W;
-  const y = Math.floor(parseInt(data[1])) / H;
-  rawData.push(x);
-  rawData.push(y);
+  if (rowCount % 2 == 0) {
+    const data = row.split(',');
+    const x = Math.floor(parseInt(data[0])) / W;
+    const y = Math.floor(parseInt(data[1])) / H;
+    rawData.push(x);
+    rawData.push(y);
+  }
+  rowCount++;
 }
 
 const xs_ = [];
@@ -48,14 +58,6 @@ start();
 
 async function start() {
   await train();
-  let inputs = rawData.slice(0, snapshot);
-  for (let i = 0; i < 10; i++) {
-    const next = await predict(inputs);
-    console.log(next);
-    inputs.splice(0, 2);
-    inputs.push(next[0]);
-    inputs.push(next[1]);
-  }
 }
 
 async function train() {
@@ -73,3 +75,31 @@ async function predict(inputs_) {
   const next = await outputs.data();
   return next;
 }
+// Server
+const express = require('express');
+
+const app = express();
+app.listen(3000, () => console.log('listening at 3000'));
+app.use(express.json({ limit: '1mb' }));
+
+let pInputs = [];
+for (let i = 0; i < snapshot; i++) {
+  pInputs[i] = Math.random();
+}
+
+app.get('/reset', async (request, response) => {
+  for (let i = 0; i < snapshot; i++) {
+    pInputs[i] = Math.random();
+  }
+  response.send('a-ok');
+});
+
+app.get('/mouse', async (request, response) => {
+  const next = await predict(pInputs);
+  console.log(next);
+  pInputs.splice(0, 2);
+  pInputs.push(next[0]);
+  pInputs.push(next[1]);
+  // response.json({ status: { mouseX: next[0], mouseY: next[1] } });
+  response.send(`${next[0]},${next[1]}`);
+});
