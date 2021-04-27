@@ -44,15 +44,32 @@ for (let i = 0; i < rawData.length - (snapshot + 2); i++) {
 const xs = tf.tensor(xs_);
 const ys = tf.tensor(ys_);
 
-async function run() {
+start();
+
+async function start() {
+  await train();
+  let inputs = rawData.slice(0, snapshot);
+  for (let i = 0; i < 10; i++) {
+    const next = await predict(inputs);
+    console.log(next);
+    inputs.splice(0, 2);
+    inputs.push(next[0]);
+    inputs.push(next[1]);
+  }
+}
+
+async function train() {
   await model.fit(xs, ys, {
-    epochs: 5,
+    epochs: 1,
     callbacks: {
       onEpochEnd: (epoch, log) => console.log(`Epoch ${epoch}: loss = ${log.loss}`),
     },
   });
+}
 
-  // const inputs = tf.tensor([rawData.slice(0, snapshot)]);
-  // const outputs = model.predict(inputs);
-  // outputs.print();
+async function predict(inputs_) {
+  const inputs = tf.tensor([inputs_]);
+  const outputs = model.predict(inputs);
+  const next = await outputs.data();
+  return next;
 }
