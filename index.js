@@ -3,18 +3,17 @@ const fs = require('fs');
 
 const snapshot = 10 * 2;
 
-// Train a simple model:
 const model = tf.sequential();
 model.add(
   tf.layers.dense({
-    units: 512,
-    activation: 'relu',
+    units: 32,
+    activation: 'sigmoid',
     inputShape: [snapshot],
   })
 );
 
 model.add(tf.layers.dense({ units: 2, activation: 'sigmoid' }));
-const optimizer = tf.train.adam();
+const optimizer = tf.train.adam(0.0001);
 model.compile({
   optimizer,
   loss: 'meanSquaredError',
@@ -28,16 +27,37 @@ const raw = fs.readFileSync(`mouse_data/mouse1619532364238.csv`, 'utf-8');
 const rows = raw.split('\n');
 const rawData = [];
 
-let rowCount = 0;
+let px = -1;
+let py = -1;
 for (let row of rows) {
-  if (rowCount % 2 == 0) {
-    const data = row.split(',');
-    const x = Math.floor(parseInt(data[0])) / W;
-    const y = Math.floor(parseInt(data[1])) / H;
-    rawData.push(x);
-    rawData.push(y);
+  const data = row.split(',');
+  const x = Math.floor(parseInt(data[0]));
+  const y = Math.floor(parseInt(data[1]));
+  if (px > -1) {
+    let dx = x - px;
+    let dy = y - py;
+    rawData.push(dx);
+    rawData.push(dy);
   }
-  rowCount++;
+  px = x;
+  py = y;
+}
+
+let minX = Infinity;
+let minY = Infinity;
+let maxX = -Infinity;
+let maxY = -Infinity;
+
+for (let i = 0; i < rawData.length; i += 2) {
+  minX = Math.min(minX, rawData[i]);
+  maxX = Math.max(maxX, rawData[i]);
+  minY = Math.min(minY, rawData[i + 1]);
+  maxY = Math.max(maxY, rawData[i + 1]);
+}
+
+for (let i = 0; i < rawData.length; i += 2) {
+  rawData[i] = (rawData[i] - minX) / (maxX - minX);
+  rawData[i + 1] = (rawData[i + 1] - minY) / (maxY - minY);
 }
 
 const xs_ = [];
@@ -54,13 +74,9 @@ for (let i = 0; i < rawData.length - (snapshot + 2); i++) {
 const xs = tf.tensor(xs_);
 const ys = tf.tensor(ys_);
 
-start();
+trainModel();
 
-async function start() {
-  await train();
-}
-
-async function train() {
+async function trainModel() {
   await model.fit(xs, ys, {
     epochs: 1,
     callbacks: {
@@ -84,12 +100,12 @@ app.use(express.json({ limit: '1mb' }));
 
 let pInputs = [];
 for (let i = 0; i < snapshot; i++) {
-  pInputs[i] = Math.random();
+  pInputs[i] = Math.random() * 2 - 1;
 }
 
 app.get('/reset', async (request, response) => {
   for (let i = 0; i < snapshot; i++) {
-    pInputs[i] = Math.random();
+    pInputs[i] = Math.random() * 2 - 1;
   }
   response.send('a-ok');
 });
